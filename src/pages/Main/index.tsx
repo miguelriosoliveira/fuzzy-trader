@@ -8,10 +8,9 @@ import {
 	FormControl,
 } from '@material-ui/core';
 
-import blockchainAPI from '../../services/apis/blockchainAPI';
+import { blockchainAPI, marketstackAPI } from '../../services/apis';
 
 import './styles.scss';
-import marketstackAPI from '../../services/apis/marketstackAPI';
 
 interface ExchangeRateProps {
 	[key: string]: {
@@ -108,7 +107,7 @@ const Main: React.FC = () => {
 				</section>
 			)}
 
-			<section className="codes">
+			<section className="exchange-rates">
 				<div>
 					<h3>Câmbio mais recente de Bitcoin (BTC)</h3>
 					<code>
@@ -117,6 +116,7 @@ const Main: React.FC = () => {
 						})}
 					</code>
 				</div>
+
 				<div>
 					<h3>Câmbio mais recente de Ações</h3>
 					<code>

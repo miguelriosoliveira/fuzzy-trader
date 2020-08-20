@@ -13,4 +13,4 @@ marketstackAPI.interceptors.request.use(config => {
 	return { ...config, params };
 });
 
-export default marketstackAPI;
+export { marketstackAPI };
