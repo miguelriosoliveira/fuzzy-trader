@@ -43,6 +43,7 @@
 			}
 		],
 		"import/prefer-default-export": "off",
+		"jsx-a11y/label-has-associated-control": ["error", { "labelAttributes": ["label"] }],
 		"prettier/prettier": "error",
 		"react-hooks/exhaustive-deps": "warn",
 		"react-hooks/rules-of-hooks": "error",

@@ -1,0 +1,17 @@
+.main-component {
+	padding: 10px 20px;
+
+	flex: 1;
+	display: grid;
+	gap: 10px;
+	grid-auto-rows: max-content;
+
+	.codes {
+		display: flex;
+		justify-content: space-around;
+		// pre {
+		// 	display: flex;
+		// 	flex-direction: column;
+		// }
+	}
+}
