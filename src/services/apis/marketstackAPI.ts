@@ -1,9 +1,6 @@
 import axios from 'axios';
 
-const marketstackAPI = axios.create({
-	baseURL: 'http://api.marketstack.com/v1/',
-	params: { access_key: process.env.REACT_APP_MARKETSTACK_API_KEY },
-});
+const marketstackAPI = axios.create({ baseURL: 'http://api.marketstack.com/v1/' });
 
 marketstackAPI.interceptors.request.use(config => {
 	const params = {

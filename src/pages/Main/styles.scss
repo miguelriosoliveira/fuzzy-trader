@@ -9,5 +9,9 @@
 	.exchange-rates {
 		display: flex;
 		justify-content: space-around;
+
+		.purchasable {
+			color: deeppink;
+		}
 	}
 }
