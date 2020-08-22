@@ -6,7 +6,7 @@
 	gap: 10px;
 	grid-auto-rows: max-content;
 
-	.exchange-rates {
+	.products {
 		display: flex;
 		justify-content: space-between;
 
@@ -22,10 +22,10 @@
 					grid-auto-flow: column;
 					gap: 10px;
 					align-items: baseline;
-					grid-template-columns: 1fr 130px;
+					grid-template-columns: 1fr 140px;
 
-					.quantity-field {
-						margin-top: 10px;
+					input {
+						text-align: center;
 					}
 				}
 
@@ -36,7 +36,7 @@
 		}
 	}
 
-	footer {
+	.subtotal {
 		code {
 			display: flex;
 			align-items: center;

@@ -6,14 +6,14 @@ import {
 	OutlinedInput,
 	InputLabel,
 	FormControl,
-	TextField,
 	Button,
 } from '@material-ui/core';
 import Axios from 'axios';
 import classnames from 'classnames';
 
-import { blockchainAPI, alphavantageAPI, marketstackAPI } from '../../services/apis';
-import { numberFormatter } from '../../utils/format';
+import Wallet, { WalletProps } from '../../components/Wallet';
+// import { blockchainAPI, alphavantageAPI, marketstackAPI } from '../../services/apis';
+import { currencyFormatter } from '../../utils/format';
 
 import './styles.scss';
 
@@ -47,15 +47,15 @@ interface QuantityProps {
 
 const Main: React.FC = () => {
 	const [loading, setLoading] = useState(true);
-	const [money, setMoney] = useState<number>(724568.78);
-	const [investValue, setInvestValue] = useState<number>(0);
-	// const [bitcoinValue, setBitcoinValue] = useState(0);
+	const [money, setMoney] = useState(724568.78);
+	const [investValue, setInvestValue] = useState(0);
 	const [cryptos, setCryptos] = useState<CryptoProps[]>([]);
 	const [stocks, setStocks] = useState<StockProps[]>([]);
 	// const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout>();
 	const [cryptoQuantity, setCryptoQuantity] = useState<QuantityProps>({});
 	const [stockQuantity, setStockQuantity] = useState<QuantityProps>({});
 	const [subtotal, setSubtotal] = useState(0);
+	const [wallet, setWallet] = useState<WalletProps>([]);
 
 	useEffect(() => {
 		setLoading(true);
@@ -115,7 +115,9 @@ const Main: React.FC = () => {
 	}, [cryptoQuantity, cryptos, stockQuantity, stocks]);
 
 	function handleChange({ target: { value } }: ChangeEvent<HTMLInputElement>): void {
-		setInvestValue(Number(value));
+		const eventValue = Number(value);
+		const maxAllowed = Math.min(money, eventValue);
+		setInvestValue(maxAllowed);
 
 		// // debounce to get value in bitcoin
 		// if (typingTimeout) {
@@ -134,6 +136,35 @@ const Main: React.FC = () => {
 		// );
 	}
 
+	function handleBuy(): void {
+		// adicionar itens selecionados à carteira
+		const purchasedCryptos = Object.entries(cryptoQuantity).map(([symbol, quantity]) => {
+			const cryptoFound = cryptos.find(crypto => crypto.symbol === symbol);
+			return {
+				symbol,
+				quantity,
+				value: cryptoFound?.value || 0,
+			};
+		});
+		const purchasedStocks = Object.entries(stockQuantity).map(([symbol, quantity]) => {
+			const stockFound = stocks.find(stock => stock.symbol === symbol);
+			return {
+				symbol,
+				quantity,
+				value: stockFound?.close || 0,
+			};
+		});
+		setWallet([...purchasedCryptos, ...purchasedStocks]);
+
+		// subtrair subtotal do valor do saldo
+		setMoney(money - subtotal);
+
+		// zerar invest value, cryptoQuantity e stockQuantity (subtotal deveria zerar automaticamente)
+		setInvestValue(0);
+		setCryptoQuantity({});
+		setStockQuantity({});
+	}
+
 	if (loading) {
 		return <CircularProgress className="loading-center" />;
 	}
@@ -141,8 +172,8 @@ const Main: React.FC = () => {
 	return (
 		<div className="main-component">
 			<header>
-				<h1>Sua carteira</h1>
-				<h2>{`$ ${numberFormatter.format(money)}`}</h2>
+				<h1>Seu saldo</h1>
+				<h2>{currencyFormatter.format(money)}</h2>
 			</header>
 
 			<FormControl fullWidth variant="outlined">
@@ -151,46 +182,40 @@ const Main: React.FC = () => {
 					id="investValue"
 					type="number"
 					label="Quanto deseja aplicar hoje?"
-					placeholder="Invista com sabedoria"
+					placeholder="Invista com sabedoria..."
 					value={investValue || ''}
 					onChange={handleChange}
-					inputProps={{ min: 1, max: money }}
+					inputProps={{ min: 0, max: money, step: 0.01 }}
 					startAdornment={<InputAdornment position="start">$</InputAdornment>}
 				/>
 			</FormControl>
 
-			{/* {!!investValue && !!bitcoinValue && (
-				<section>
-					<h3>Valor em bitcoin:</h3>
-					<span>{bitcoinValue}</span>
-				</section>
-			)} */}
-
-			<section className="exchange-rates">
+			<section className="products">
 				<div>
 					<h3>Criptomoedas</h3>
 					<pre>
 						{cryptos.map(({ symbol, value }) => {
 							const x = investValue - subtotal + value * (cryptoQuantity[symbol] || 0);
 							const purchasable = x >= value;
+							const max = x / value;
 
 							return (
 								<div key={symbol} className="line">
 									<span className={classnames({ purchasable })}>
-										{`[${symbol.padEnd(4, ' ')}] $ ${numberFormatter.format(value)}`}
+										{`[${symbol.padEnd(4, ' ')}] ${currencyFormatter.format(value)}`}
 									</span>
 									{purchasable && (
-										<TextField
-											size="small"
+										<input
 											type="number"
-											variant="standard"
-											className="quantity-field"
-											label="Quantidade"
+											step=".01"
+											min={0}
+											max={max}
 											value={cryptoQuantity[symbol] || 0}
 											onChange={e => {
-												setCryptoQuantity({ ...cryptoQuantity, [symbol]: Number(e.target.value) });
+												const eventValue = Number(e.target.value);
+												const maxAllowed = Math.min(max, eventValue);
+												setCryptoQuantity({ ...cryptoQuantity, [symbol]: maxAllowed });
 											}}
-											inputProps={{ min: 0, max: Math.floor(x / value) }}
 										/>
 									)}
 								</div>
@@ -205,24 +230,24 @@ const Main: React.FC = () => {
 						{stocks.map(({ symbol, close }) => {
 							const x = investValue - subtotal + close * (stockQuantity[symbol] || 0);
 							const purchasable = x >= close;
+							const max = Math.floor(x / close);
 
 							return (
 								<div key={symbol} className="line">
 									<span className={classnames({ purchasable })}>
-										{`[${symbol.padEnd(5, ' ')}] $ ${numberFormatter.format(close)}`}
+										{`[${symbol.padEnd(5, ' ')}] ${currencyFormatter.format(close)}`}
 									</span>
 									{purchasable && (
-										<TextField
-											size="small"
+										<input
 											type="number"
-											variant="standard"
-											className="quantity-field"
-											label="Quantidade"
+											min={0}
+											max={max}
 											value={stockQuantity[symbol] || 0}
 											onChange={e => {
-												setStockQuantity({ ...stockQuantity, [symbol]: Number(e.target.value) });
+												const eventValue = Number(e.target.value);
+												const maxAllowed = Math.min(max, eventValue);
+												setStockQuantity({ ...stockQuantity, [symbol]: maxAllowed });
 											}}
-											inputProps={{ min: 0, max: Math.floor(x / close) }}
 										/>
 									)}
 								</div>
@@ -232,18 +257,20 @@ const Main: React.FC = () => {
 				</div>
 			</section>
 
-			<footer>
+			<section className="subtotal">
 				<h3>Subtotal</h3>
 				<code>
-					{`$ ${numberFormatter.format(subtotal)}`}
+					{currencyFormatter.format(subtotal)}
 
 					{subtotal > 0 && (
-						<Button variant="contained" color="primary" size="small">
+						<Button variant="contained" color="primary" size="small" onClick={handleBuy}>
 							Comprar
 						</Button>
 					)}
 				</code>
-			</footer>
+			</section>
+
+			<Wallet wallet={wallet} />
 		</div>
 	);
 };

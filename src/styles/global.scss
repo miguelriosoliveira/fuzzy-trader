@@ -30,6 +30,18 @@ button {
 	cursor: pointer;
 }
 
+input {
+	&::-webkit-outer-spin-button,
+	&::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+
+	&[type='number'] {
+		-moz-appearance: textfield;
+	}
+}
+
 .loading-center {
 	width: 100% !important;
 	height: 100% !important;
@@ -44,4 +56,10 @@ button {
 		height: 40px;
 		animation: MuiCircularProgress-keyframes-circular-rotate 1.4s linear infinite;
 	}
+}
+
+.filler {
+	flex: 1;
+	border-bottom: 2px dotted;
+	margin: 0 7px 4px;
 }
