@@ -8,10 +8,42 @@
 
 	.exchange-rates {
 		display: flex;
-		justify-content: space-around;
+		justify-content: space-between;
 
-		.purchasable {
-			color: deeppink;
+		> div {
+			width: 49%;
+
+			pre {
+				display: flex;
+				flex-direction: column;
+
+				.line {
+					display: grid;
+					grid-auto-flow: column;
+					gap: 10px;
+					align-items: baseline;
+					grid-template-columns: 1fr 130px;
+
+					.quantity-field {
+						margin-top: 10px;
+					}
+				}
+
+				.purchasable {
+					color: deeppink;
+				}
+			}
+		}
+	}
+
+	footer {
+		code {
+			display: flex;
+			align-items: center;
+
+			button {
+				margin-left: 10px;
+			}
 		}
 	}
 }
