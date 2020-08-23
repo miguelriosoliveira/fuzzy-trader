@@ -12,7 +12,7 @@ import Axios from 'axios';
 import classnames from 'classnames';
 
 import Wallet, { WalletProps } from '../../components/Wallet';
-// import { blockchainAPI, alphavantageAPI, marketstackAPI } from '../../services/apis';
+import { mainAPI } from '../../services/apis/mainAPI';
 import { currencyFormatter } from '../../utils/format';
 
 import './styles.scss';
@@ -31,6 +31,7 @@ interface CryptoProps {
 interface StockProps {
 	symbol: string;
 	close: number;
+	value: number;
 }
 
 // interface TickerAPIProps {
@@ -47,7 +48,7 @@ interface QuantityProps {
 
 const Main: React.FC = () => {
 	const [loading, setLoading] = useState(true);
-	const [money, setMoney] = useState(724568.78);
+	const [money, setMoney] = useState(0);
 	const [investValue, setInvestValue] = useState(0);
 	const [cryptos, setCryptos] = useState<CryptoProps[]>([]);
 	const [stocks, setStocks] = useState<StockProps[]>([]);
@@ -60,19 +61,12 @@ const Main: React.FC = () => {
 	useEffect(() => {
 		setLoading(true);
 
+		const getBalance = mainAPI.get('balance');
+		const getWallet = mainAPI.get('wallet');
+
 		// get bitcoin values
 		// blockchainAPI.get('ticker').then(response => setExchangeRates(response.data));
-		Axios.get<CryptoAPIProps>('https://demo6455206.mockable.io/crypto').then(response => {
-			const cryptosSorted = Object.entries(response.data)
-				.map(([symbol, crypto]) => ({
-					...crypto,
-					symbol: symbol.slice(0, symbol.length - 3),
-					value: crypto.last,
-				}))
-				.sort((a, b) => a.value - b.value);
-
-			setCryptos(cryptosSorted);
-		});
+		const getCryptos = Axios.get<CryptoAPIProps>('https://demo6455206.mockable.io/crypto');
 
 		// get stocks
 		// marketstackAPI
@@ -87,13 +81,26 @@ const Main: React.FC = () => {
 		// 				setTickers(response2.data.data.map(eod => ({ ...eod, value: eod.close })));
 		// 			});
 		// 	});
-		Axios.get<StockProps[]>('https://demo6455206.mockable.io/stocks')
-			.then(response => {
-				const tickersUpdated = response.data
-					.map(eod => ({ ...eod, value: eod.close }))
-					.sort((a, b) => a.value - b.value);
+		const getStocks = Axios.get<StockProps[]>('https://demo6455206.mockable.io/stocks');
 
-				setStocks(tickersUpdated);
+		Promise.all([getBalance, getWallet, getCryptos, getStocks])
+			.then(([balanceResponse, walletResponse, cryptosResponse, stocksResponse]) => {
+				setMoney(balanceResponse.data);
+				setWallet(walletResponse.data);
+
+				const cryptosSorted = Object.entries(cryptosResponse.data)
+					.map(([symbol, crypto]) => ({
+						...crypto,
+						symbol: symbol.slice(0, symbol.length - 3),
+						value: crypto.last,
+					}))
+					.sort((a, b) => a.value - b.value);
+				setCryptos(cryptosSorted);
+
+				const stocksSorted = stocksResponse.data
+					.map(stock => ({ ...stock, value: stock.close }))
+					.sort((a, b) => a.value - b.value);
+				setStocks(stocksSorted);
 			})
 			.finally(() => setLoading(false));
 	}, []);
@@ -106,8 +113,8 @@ const Main: React.FC = () => {
 		}, 0);
 
 		const stocksSubtotal = Object.entries(stockQuantity).reduce((acc, [symbol, qtd]) => {
-			const stock = stocks.find(ticker => ticker.symbol === symbol) || { close: 0 };
-			const sum = qtd * stock.close;
+			const stock = stocks.find(ticker => ticker.symbol === symbol) || { value: 0 };
+			const sum = qtd * stock.value;
 			return acc + sum;
 		}, 0);
 
@@ -136,7 +143,7 @@ const Main: React.FC = () => {
 		// );
 	}
 
-	function handleBuy(): void {
+	async function handleBuy(): Promise<void> {
 		// adicionar itens selecionados à carteira
 		const purchasedCryptos = Object.entries(cryptoQuantity).map(([symbol, quantity]) => {
 			const cryptoFound = cryptos.find(crypto => crypto.symbol === symbol);
@@ -151,10 +158,27 @@ const Main: React.FC = () => {
 			return {
 				symbol,
 				quantity,
-				value: stockFound?.close || 0,
+				value: stockFound?.value || 0,
 			};
 		});
-		setWallet([...purchasedCryptos, ...purchasedStocks]);
+		const purchasedAssets = [...purchasedCryptos, ...purchasedStocks];
+
+		// adicionar itens selecionados à carteira DE FATO
+		try {
+			await mainAPI.post('purchase', purchasedAssets);
+		} catch (error) {
+			console.error(error);
+			return;
+		}
+
+		// atualizar itens da carteira no front
+		try {
+			const response = await mainAPI.get('wallet');
+			setWallet(response.data);
+		} catch (error) {
+			console.error(error);
+			return;
+		}
 
 		// subtrair subtotal do valor do saldo
 		setMoney(money - subtotal);
@@ -181,6 +205,7 @@ const Main: React.FC = () => {
 				<OutlinedInput
 					id="investValue"
 					type="number"
+					color="secondary"
 					label="Quanto deseja aplicar hoje?"
 					placeholder="Invista com sabedoria..."
 					value={investValue || ''}
@@ -227,15 +252,15 @@ const Main: React.FC = () => {
 				<div>
 					<h3>Ações</h3>
 					<pre>
-						{stocks.map(({ symbol, close }) => {
-							const x = investValue - subtotal + close * (stockQuantity[symbol] || 0);
-							const purchasable = x >= close;
-							const max = Math.floor(x / close);
+						{stocks.map(({ symbol, value }) => {
+							const x = investValue - subtotal + value * (stockQuantity[symbol] || 0);
+							const purchasable = x >= value;
+							const max = Math.floor(x / value);
 
 							return (
 								<div key={symbol} className="line">
 									<span className={classnames({ purchasable })}>
-										{`[${symbol.padEnd(5, ' ')}] ${currencyFormatter.format(close)}`}
+										{`[${symbol.padEnd(5, ' ')}] ${currencyFormatter.format(value)}`}
 									</span>
 									{purchasable && (
 										<input

@@ -1,5 +1,5 @@
 {
-	"name": "fuzzy-trader",
+	"name": "fuzzy-trader-web",
 	"version": "0.1.0",
 	"private": true,
 	"scripts": {
@@ -35,7 +35,7 @@
 		"react": "^16.13.1",
 		"react-dom": "^16.13.1",
 		"react-scripts": "3.4.3",
-		"typescript": "~3.7.2"
+		"typescript": "^4.0.2"
 	},
 	"devDependencies": {
 		"@types/classnames": "^2.2.10",
