@@ -205,7 +205,6 @@ const Main: React.FC = () => {
 				<OutlinedInput
 					id="investValue"
 					type="number"
-					color="secondary"
 					label="Quanto deseja aplicar hoje?"
 					placeholder="Invista com sabedoria..."
 					value={investValue || ''}
