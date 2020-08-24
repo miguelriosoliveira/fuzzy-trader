@@ -309,7 +309,7 @@ const Main: React.FC = () => {
 					cryptos={cryptos}
 					investValue={investValue}
 					subtotal={subtotal}
-					quantityObject={stockQuantity}
+					quantityObject={cryptoQuantity}
 					handleChangeQuantity={(max, symbol) => e => {
 						const eventValue = Number(e.target.value);
 						const maxAllowed = Math.min(max, eventValue);
