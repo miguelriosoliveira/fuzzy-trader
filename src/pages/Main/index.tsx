@@ -14,7 +14,7 @@ import CryptosMenu from '../../components/CryptosMenu';
 import StocksMenu from '../../components/StocksMenu';
 import Wallet, { WalletProps } from '../../components/Wallet';
 import { StockProps, CryptoProps, QuantityProps } from '../../Interfaces';
-import { mainAPI, coinAPI, marketstackAPI } from '../../services/apis';
+import { mainAPI, coinAPI } from '../../services/apis';
 import { currencyFormatter } from '../../utils/format';
 
 import './styles.scss';
@@ -46,8 +46,7 @@ const CRYPTO_ICONS_KEY = '@fuzzy-trader:crypto-icons';
 const STOCKS_KEY = '@fuzzy-trader:stocks';
 const STOCK_NAMES_KEY = '@fuzzy-trader:stock-names';
 const WANTED_CRYPTOS = ['BTC', 'ETH', 'XRP', 'BOT', 'LTC', '42', 'BCC', 'XIN', 'BCH', 'XMR'];
-// const WANTED_STOCKS = ['DIS', 'TWTR', 'ZM', 'UBER', 'MSFT', 'FB', 'AAPL', 'NFLX', 'GOOG', 'AMZN'];
-const WANTED_STOCKS = ['DIS'];
+const WANTED_STOCKS = ['DIS', 'TWTR', 'ZM', 'UBER', 'MSFT', 'FB', 'AAPL', 'NFLX', 'GOOG', 'AMZN'];
 
 const Main: React.FC = () => {
 	const [loading, setLoading] = useState(true);
@@ -141,9 +140,6 @@ const Main: React.FC = () => {
 			return new Promise((resolve, reject) => resolve(JSON.parse(cachedStocks) as StockProps[]));
 		}
 		// get online
-		// return marketstackAPI
-		// 	.get<{ data: StockProps[] }>('eod/latest', { params: { symbols: WANTED_STOCKS } })
-		// 	.then(response => response.data.data);
 		return mainAPI
 			.get('marketstack', {
 				params: {
@@ -163,9 +159,6 @@ const Main: React.FC = () => {
 			});
 		}
 		// get online
-		// const getStockNamesCalls = WANTED_STOCKS.map(stockCode => {
-		// 	return marketstackAPI.get<StockProps>(`tickers/${stockCode}`).then(response => response.data);
-		// });
 		const getStockNamesCalls = WANTED_STOCKS.map(stockCode => {
 			return mainAPI
 				.get('marketstack', { params: { route: `tickers/${stockCode}` } })
@@ -196,6 +189,7 @@ const Main: React.FC = () => {
 		getData();
 	}, [getData]);
 
+	// atualizar subtotal ao selecionar ativos
 	useEffect(() => {
 		const cryptoSubtotal = Object.entries(cryptoQuantity).reduce((acc, [symbol, qtd]) => {
 			const crypto = cryptos.find(item => item.symbol === symbol) || { value: 0 };
