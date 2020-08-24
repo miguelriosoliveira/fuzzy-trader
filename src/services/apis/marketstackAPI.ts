@@ -2,7 +2,7 @@ import axios from 'axios';
 import qs from 'qs';
 
 const marketstackAPI = axios.create({
-	baseURL: 'http://api.marketstack.com/v1/',
+	baseURL: 'https://api.marketstack.com/v1/',
 	paramsSerializer: params => qs.stringify(params, { arrayFormat: 'comma' }),
 });
 
