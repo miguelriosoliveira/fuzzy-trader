@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ChangeEvent } from 'react';
+import React, { useState, useEffect, useCallback, ChangeEvent, KeyboardEvent } from 'react';
 
 import {
 	CircularProgress,
@@ -8,102 +8,179 @@ import {
 	FormControl,
 	Button,
 } from '@material-ui/core';
-import Axios from 'axios';
-import classnames from 'classnames';
 
+import ConfirmationDialog from '../../components/ConfirmationDialog';
+import CryptosMenu from '../../components/CryptosMenu';
+import StocksMenu from '../../components/StocksMenu';
 import Wallet, { WalletProps } from '../../components/Wallet';
-import { mainAPI } from '../../services/apis/mainAPI';
+import { StockProps, CryptoProps, QuantityProps } from '../../Interfaces';
+import { mainAPI, coinAPI, marketstackAPI } from '../../services/apis';
 import { currencyFormatter } from '../../utils/format';
 
 import './styles.scss';
 
-interface CryptoAPIProps {
-	[key: string]: {
-		last: number;
-	};
+type CoinAPIAssetProps = Array<{
+	asset_id: string;
+	name: string;
+	type_is_crypto: 0 | 1;
+	price_usd: number;
+}>;
+
+type CoinAPIIconProps = Array<{
+	asset_id: string;
+	url: string;
+}>;
+
+interface SaveCryptoProps {
+	cryptoList: CoinAPIAssetProps;
+	iconList: CoinAPIIconProps;
 }
 
-interface CryptoProps {
-	symbol: string;
-	value: number;
+interface SaveStockProps {
+	stockList: StockProps[];
+	namesList: StockProps[];
 }
 
-interface StockProps {
-	symbol: string;
-	close: number;
-	value: number;
-}
-
-// interface TickerAPIProps {
-// 	data: Array<{ symbol: string }>;
-// }
-
-// interface EodAPIProps {
-// 	data: Array<StockProps>;
-// }
-
-interface QuantityProps {
-	[key: string]: number;
-}
+const CRYPTOS_KEY = '@fuzzy-trader:cryptos';
+const CRYPTO_ICONS_KEY = '@fuzzy-trader:crypto-icons';
+const STOCKS_KEY = '@fuzzy-trader:stocks';
+const STOCK_NAMES_KEY = '@fuzzy-trader:stock-names';
+const WANTED_CRYPTOS = ['BTC', 'ETH', 'XRP', 'BOT', 'LTC', '42', 'BCC', 'XIN', 'BCH', 'XMR'];
+const WANTED_STOCKS = ['DIS', 'TWTR', 'ZM', 'UBER', 'MSFT', 'FB', 'AAPL', 'NFLX', 'GOOG', 'AMZN'];
 
 const Main: React.FC = () => {
 	const [loading, setLoading] = useState(true);
-	const [money, setMoney] = useState(0);
 	const [investValue, setInvestValue] = useState(0);
 	const [cryptos, setCryptos] = useState<CryptoProps[]>([]);
 	const [stocks, setStocks] = useState<StockProps[]>([]);
-	// const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout>();
 	const [cryptoQuantity, setCryptoQuantity] = useState<QuantityProps>({});
 	const [stockQuantity, setStockQuantity] = useState<QuantityProps>({});
 	const [subtotal, setSubtotal] = useState(0);
 	const [wallet, setWallet] = useState<WalletProps>([]);
+	const [confirmationOpen, setConfirmationOpen] = useState(false);
 
-	useEffect(() => {
+	function saveCryptos({ cryptoList, iconList }: SaveCryptoProps): void {
+		// crypto prices
+		const onlyWantedCrypto = cryptoList
+			.filter(asset => WANTED_CRYPTOS.includes(asset.asset_id))
+			.map(({ asset_id, name, price_usd }) => ({ asset_id, name, price_usd }))
+			.sort((a, b) => a.price_usd - b.price_usd);
+
+		// crypto icons
+		const onlyWantedIcons = iconList.filter(icon => WANTED_CRYPTOS.includes(icon.asset_id));
+		const cryptoWithIcons = onlyWantedCrypto.map(
+			(coin): CryptoProps => {
+				const coinIcon = onlyWantedIcons.find(icon => icon.asset_id === coin.asset_id);
+
+				return {
+					symbol: coin.asset_id,
+					name: coin.name,
+					value: coin.price_usd,
+					icon_url: coinIcon?.url || '',
+				};
+			},
+		);
+		setCryptos(cryptoWithIcons);
+
+		// cache
+		localStorage.setItem(CRYPTOS_KEY, JSON.stringify(cryptoList));
+		localStorage.setItem(CRYPTO_ICONS_KEY, JSON.stringify(iconList));
+	}
+
+	async function getCryptos(): Promise<CoinAPIAssetProps> {
+		// get from cache
+		const cachedCryptos = localStorage.getItem(CRYPTOS_KEY);
+		if (cachedCryptos) {
+			// get cached
+			return new Promise((resolve, reject) =>
+				resolve(JSON.parse(cachedCryptos) as CoinAPIAssetProps),
+			);
+		}
+		// get online
+		return coinAPI.get<CoinAPIAssetProps>('assets').then(response => response.data);
+	}
+
+	async function getCryptoIcons(): Promise<CoinAPIIconProps> {
+		const cachedCryptoIcons = localStorage.getItem(CRYPTO_ICONS_KEY);
+		if (cachedCryptoIcons) {
+			// get cached
+			return new Promise((resolve, reject) =>
+				resolve(JSON.parse(cachedCryptoIcons) as CoinAPIIconProps),
+			);
+		}
+		// get online
+		return coinAPI.get<CoinAPIIconProps>('assets/icons/32').then(response => response.data);
+	}
+
+	function saveStocks({ stockList, namesList }: SaveStockProps): void {
+		// almost all stock data
+		const stocksSorted = stockList
+			.map(stock => ({ ...stock, value: stock.close }))
+			.sort((a, b) => a.value - b.value);
+
+		// stock name data
+		const stocksWithNames = stocksSorted.map(stock => {
+			const stockName = namesList.find(nameData => nameData.symbol === stock.symbol);
+			return {
+				...stock,
+				name: stockName?.name || '',
+			};
+		});
+		setStocks(stocksWithNames);
+
+		// cache
+		localStorage.setItem(STOCKS_KEY, JSON.stringify(stockList));
+		localStorage.setItem(STOCK_NAMES_KEY, JSON.stringify(namesList));
+	}
+
+	async function getStocks(): Promise<StockProps[]> {
+		const cachedStocks = localStorage.getItem(STOCKS_KEY);
+		if (cachedStocks) {
+			// get cached
+			return new Promise((resolve, reject) => resolve(JSON.parse(cachedStocks) as StockProps[]));
+		}
+		// get online
+		return marketstackAPI
+			.get<{ data: StockProps[] }>('eod/latest', { params: { symbols: WANTED_STOCKS } })
+			.then(response => response.data.data);
+	}
+
+	async function getStockNames(): Promise<StockProps[]> {
+		const cachedStockNames = localStorage.getItem(STOCK_NAMES_KEY);
+		if (cachedStockNames) {
+			// get cached
+			return new Promise((resolve, reject) => {
+				return resolve(JSON.parse(cachedStockNames) as StockProps[]);
+			});
+		}
+		// get online
+		const getStockNamesCalls = WANTED_STOCKS.map(stockCode => {
+			return marketstackAPI.get<StockProps>(`tickers/${stockCode}`).then(response => response.data);
+		});
+		return Promise.all(getStockNamesCalls);
+	}
+
+	const getData = useCallback(() => {
 		setLoading(true);
 
-		const getBalance = mainAPI.get('balance');
-		const getWallet = mainAPI.get('wallet');
-
-		// get bitcoin values
-		// blockchainAPI.get('ticker').then(response => setExchangeRates(response.data));
-		const getCryptos = Axios.get<CryptoAPIProps>('https://demo6455206.mockable.io/crypto');
-
-		// get stocks
-		// marketstackAPI
-		// 	.get<TickerAPIProps>('tickers', { params: { limit: 10 } })
-		// 	.then(response => {
-		// 		const symbols = response.data.data.map(ticker => ticker.symbol).join(',');
-		// 		marketstackAPI
-		// 			.get<EodAPIProps>('eod/latest', { params: { symbols } })
-		// 			.then(response2 => {
-		// 				const val = response2.data.data.map(eod => ({ ...eod, value: eod.close }));
-		// 				console.log(JSON.stringify(val, null, 4));
-		// 				setTickers(response2.data.data.map(eod => ({ ...eod, value: eod.close })));
-		// 			});
-		// 	});
-		const getStocks = Axios.get<StockProps[]>('https://demo6455206.mockable.io/stocks');
-
-		Promise.all([getBalance, getWallet, getCryptos, getStocks])
-			.then(([balanceResponse, walletResponse, cryptosResponse, stocksResponse]) => {
-				setMoney(balanceResponse.data);
-				setWallet(walletResponse.data);
-
-				const cryptosSorted = Object.entries(cryptosResponse.data)
-					.map(([symbol, crypto]) => ({
-						...crypto,
-						symbol: symbol.slice(0, symbol.length - 3),
-						value: crypto.last,
-					}))
-					.sort((a, b) => a.value - b.value);
-				setCryptos(cryptosSorted);
-
-				const stocksSorted = stocksResponse.data
-					.map(stock => ({ ...stock, value: stock.close }))
-					.sort((a, b) => a.value - b.value);
-				setStocks(stocksSorted);
+		Promise.all([
+			mainAPI.get('wallet').then(response => response.data),
+			getCryptos(),
+			getCryptoIcons(),
+			getStocks(),
+			getStockNames(),
+		])
+			.then(([walletData, cryptoList, iconList, stockList, namesList]) => {
+				setWallet(walletData);
+				saveCryptos({ cryptoList, iconList });
+				saveStocks({ stockList, namesList });
 			})
 			.finally(() => setLoading(false));
 	}, []);
+
+	useEffect(() => {
+		getData();
+	}, [getData]);
 
 	useEffect(() => {
 		const cryptoSubtotal = Object.entries(cryptoQuantity).reduce((acc, [symbol, qtd]) => {
@@ -121,29 +198,7 @@ const Main: React.FC = () => {
 		setSubtotal(cryptoSubtotal + stocksSubtotal);
 	}, [cryptoQuantity, cryptos, stockQuantity, stocks]);
 
-	function handleChange({ target: { value } }: ChangeEvent<HTMLInputElement>): void {
-		const eventValue = Number(value);
-		const maxAllowed = Math.min(money, eventValue);
-		setInvestValue(maxAllowed);
-
-		// // debounce to get value in bitcoin
-		// if (typingTimeout) {
-		// 	clearTimeout(typingTimeout);
-		// }
-		// if (!value) {
-		// 	setBitcoinValue(0);
-		// 	return;
-		// }
-		// setTypingTimeout(
-		// 	setTimeout(() => {
-		// 		blockchainAPI
-		// 			.get('tobtc', { params: { currency: 'USD', value } })
-		// 			.then(response => setBitcoinValue(response.data));
-		// 	}, 500),
-		// );
-	}
-
-	async function handleBuy(): Promise<void> {
+	async function handlePurchase(): Promise<void> {
 		// adicionar itens selecionados à carteira
 		const purchasedCryptos = Object.entries(cryptoQuantity).map(([symbol, quantity]) => {
 			const cryptoFound = cryptos.find(crypto => crypto.symbol === symbol);
@@ -180,13 +235,34 @@ const Main: React.FC = () => {
 			return;
 		}
 
-		// subtrair subtotal do valor do saldo
-		setMoney(money - subtotal);
-
 		// zerar invest value, cryptoQuantity e stockQuantity (subtotal deveria zerar automaticamente)
 		setInvestValue(0);
 		setCryptoQuantity({});
 		setStockQuantity({});
+	}
+
+	function handleClearCache(): void {
+		localStorage.clear();
+		getData();
+	}
+
+	function handleOpenConfirmation(): void {
+		setConfirmationOpen(true);
+	}
+
+	function handleCloseConfirmation(): void {
+		setConfirmationOpen(false);
+	}
+
+	function handleChangeInvestValue(e: ChangeEvent<HTMLInputElement>): void {
+		setInvestValue(Number(e.target.value));
+	}
+
+	function handleKeyDownInvestValue(e: KeyboardEvent): void {
+		const invalidChars = ['e', '-', '+'];
+		if (invalidChars.includes(e.key)) {
+			e.preventDefault();
+		}
 	}
 
 	if (loading) {
@@ -196,8 +272,12 @@ const Main: React.FC = () => {
 	return (
 		<div className="main-component">
 			<header>
-				<h1>Seu saldo</h1>
-				<h2>{currencyFormatter.format(money)}</h2>
+				<h1>
+					<span>Bem-vindo à </span>
+					<i>Crypto &amp; Stocks</i>
+				</h1>
+
+				<Button onClick={handleOpenConfirmation}>Apagar cache</Button>
 			</header>
 
 			<FormControl fullWidth variant="outlined">
@@ -208,77 +288,39 @@ const Main: React.FC = () => {
 					label="Quanto deseja aplicar hoje?"
 					placeholder="Invista com sabedoria..."
 					value={investValue || ''}
-					onChange={handleChange}
-					inputProps={{ min: 0, max: money, step: 0.01 }}
+					onChange={handleChangeInvestValue}
+					onKeyDown={handleKeyDownInvestValue}
+					inputProps={{ min: 0, step: 0.01 }}
 					startAdornment={<InputAdornment position="start">$</InputAdornment>}
 				/>
 			</FormControl>
 
 			<section className="products">
-				<div>
-					<h3>Criptomoedas</h3>
-					<pre>
-						{cryptos.map(({ symbol, value }) => {
-							const x = investValue - subtotal + value * (cryptoQuantity[symbol] || 0);
-							const purchasable = x >= value;
-							const max = x / value;
+				<CryptosMenu
+					title="Criptomoedas"
+					cryptos={cryptos}
+					investValue={investValue}
+					subtotal={subtotal}
+					quantityObject={stockQuantity}
+					handleChangeQuantity={(max, symbol) => e => {
+						const eventValue = Number(e.target.value);
+						const maxAllowed = Math.min(max, eventValue);
+						setCryptoQuantity({ ...cryptoQuantity, [symbol]: maxAllowed });
+					}}
+				/>
 
-							return (
-								<div key={symbol} className="line">
-									<span className={classnames({ purchasable })}>
-										{`[${symbol.padEnd(4, ' ')}] ${currencyFormatter.format(value)}`}
-									</span>
-									{purchasable && (
-										<input
-											type="number"
-											step=".01"
-											min={0}
-											max={max}
-											value={cryptoQuantity[symbol] || 0}
-											onChange={e => {
-												const eventValue = Number(e.target.value);
-												const maxAllowed = Math.min(max, eventValue);
-												setCryptoQuantity({ ...cryptoQuantity, [symbol]: maxAllowed });
-											}}
-										/>
-									)}
-								</div>
-							);
-						})}
-					</pre>
-				</div>
-
-				<div>
-					<h3>Ações</h3>
-					<pre>
-						{stocks.map(({ symbol, value }) => {
-							const x = investValue - subtotal + value * (stockQuantity[symbol] || 0);
-							const purchasable = x >= value;
-							const max = Math.floor(x / value);
-
-							return (
-								<div key={symbol} className="line">
-									<span className={classnames({ purchasable })}>
-										{`[${symbol.padEnd(5, ' ')}] ${currencyFormatter.format(value)}`}
-									</span>
-									{purchasable && (
-										<input
-											type="number"
-											min={0}
-											max={max}
-											value={stockQuantity[symbol] || 0}
-											onChange={e => {
-												const eventValue = Number(e.target.value);
-												const maxAllowed = Math.min(max, eventValue);
-												setStockQuantity({ ...stockQuantity, [symbol]: maxAllowed });
-											}}
-										/>
-									)}
-								</div>
-							);
-						})}
-					</pre>
-				</div>
+				<StocksMenu
+					title="Ações"
+					stocks={stocks}
+					investValue={investValue}
+					subtotal={subtotal}
+					quantityObject={stockQuantity}
+					handleChangeQuantity={(max, symbol) => e => {
+						const eventValue = Number(e.target.value);
+						const maxAllowed = Math.min(max, eventValue);
+						setStockQuantity({ ...stockQuantity, [symbol]: maxAllowed });
+					}}
+				/>
 			</section>
 
 			<section className="subtotal">
@@ -287,7 +329,7 @@ const Main: React.FC = () => {
 					{currencyFormatter.format(subtotal)}
 
 					{subtotal > 0 && (
-						<Button variant="contained" color="primary" size="small" onClick={handleBuy}>
+						<Button variant="contained" color="primary" size="small" onClick={handlePurchase}>
 							Comprar
 						</Button>
 					)}
@@ -295,6 +337,12 @@ const Main: React.FC = () => {
 			</section>
 
 			<Wallet wallet={wallet} />
+
+			<ConfirmationDialog
+				open={confirmationOpen}
+				handleCancel={handleCloseConfirmation}
+				handleOk={handleClearCache}
+			/>
 		</div>
 	);
 };

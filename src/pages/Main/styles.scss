@@ -1,6 +1,6 @@
 .main-component {
 	padding: 10px 20px;
-	max-width: 800px;
+	max-width: 900px;
 	margin: 0 auto;
 
 	height: fit-content;
@@ -9,7 +9,10 @@
 	gap: 10px;
 	grid-auto-rows: max-content;
 
-	#investValue {
+	header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 	}
 
 	.products {
@@ -27,8 +30,20 @@
 					display: grid;
 					grid-auto-flow: column;
 					gap: 10px;
-					align-items: baseline;
-					grid-template-columns: 1fr 140px;
+					align-items: center;
+					grid-template-columns: 1fr 170px;
+
+					span {
+						display: grid;
+						gap: 5px;
+						grid-auto-flow: column;
+						grid-template-columns: auto 1fr;
+						align-items: center;
+
+						img {
+							width: 20px;
+						}
+					}
 
 					input {
 						text-align: center;

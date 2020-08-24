@@ -26,7 +26,7 @@ const Wallet: React.FC<Props> = ({ wallet }) => {
 
 	return (
 		<div className="wallet-component">
-			<h3>CARTEIRA</h3>
+			<h3>CARTEIRA DE ATIVOS</h3>
 
 			{wallet.map(({ symbol, value, quantity }) => (
 				<div key={symbol} className="item">
